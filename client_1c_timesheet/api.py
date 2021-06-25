@@ -170,7 +170,7 @@ class APIRawResponse:
 
         """
         if self.raw_response.status_code in [200, 201]:
-            return self.parse_json(self.raw_response)
+            return self.parse_json(self.raw_response)['value']
         else:
             error_response = self.parse_json_clockify_error(self.raw_response)
             msg = f"HTTP {self.raw_response.status_code} containing API error '{self.raw_response.text}'"

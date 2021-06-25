@@ -37,7 +37,7 @@ def test_api(credentials):
     auth = (credentials['user'], credentials['password'])
     api = APIServer(url)
     path = "Catalog_Контрагенты"
-    assert api.get(path, auth)['odata.metadata'].endswith(path)
+    assert api.get(path, auth)[0]['Ref_Key'].endswith('080027d91ffd')
     data = {
             "ДатаНачалаПериода": "2021-06-01T00:00:00",
             "ДатаОкончанияПериода": "2021-06-30T00:00:00",
@@ -46,3 +46,5 @@ def test_api(credentials):
     }
     #path = 'Document_ТабельУчетаРабочегоВремени'
     #assert api.post(path, auth, data)['odata.metadata'].endswith('@Element')
+
+

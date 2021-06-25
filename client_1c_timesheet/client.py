@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import datetime
-from clockifyclient.api import APIServer, APIServer404
-from clockifyclient.decorators import request_rate_watchdog
-from clockifyclient.models import Workspace, User, Project, Task, TimeEntry, ClockifyDatetime, Tag, Client, HourlyRate
+from client_1c_timesheet.api import APIServer, APIServer404
+from client_1c_timesheet.decorators import request_rate_watchdog
+from client_1c_timesheet.models import TimeGroup, Organization, Employee, TimeSheetLine, TimeSheetRecord, User, Project, Task, TimeEntry, ClockifyDatetime, Tag, Client, HourlyRate
 from functools import lru_cache
 from typing import List, Dict
 
@@ -27,17 +27,29 @@ class APISession:
         self.auth = auth
         self.api = API1C(api_server=api_server)
 
-    @lru_cache()
-    @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
-    def get_default_workspace(self) -> Workspace:
-        return self.api.get_workspaces(api_key=self.api_key)[0]
 
     @lru_cache()
     @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
-    def get_workspaces(self) -> List[Workspace]:
-        return self.api.get_workspaces(api_key=self.api_key)
+    def get_time_groups(self) -> List[TimeGroup]:
+        return self.api.get_time_groups(auth=self.auth)
 
+    @lru_cache()
     @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
+    def get_organizations(self) -> List[Organization]:
+        return self.api.get_organizations(auth=self.auth)
+
+
+    @lru_cache()
+    @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
+    def get_employees(self) -> List[Employee]:
+        return self.api.get_employees(auth=self.auth)
+
+    @lru_cache()
+    @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
+    def get_time_sheet_lines(self) -> List[TimeSheetLine]:
+        return self.api.get_time_sheet_lines(auth=self.auth)
+
+'''@request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
     def make_workspace(self, workspace_name: str) -> Workspace:
         return self.api.make_workspace(api_key=self.api_key, workspace_name=workspace_name)
 
@@ -209,7 +221,7 @@ class APISession:
 
         """
         return datetime.datetime.utcnow()
-
+'''
 
 class API1C:
     """A 1C API in the python world. Returns python objects. Does not know about http requests
@@ -230,36 +242,62 @@ class API1C:
 
         self.api_server = api_server
 
-    def get_workspaces(self, api_key) -> List[Workspace]:
-        """Get all workspaces for the given api key
+    def get_time_groups(self, auth) -> List[TimeGroup]:
+        """Get all time groups for the given account
 
         Parameters
         ----------
-        api_key: str
-            Clockify Api key
+        auth: (str, str)
+            1C basic auth
 
         Returns
         -------
-        List[Workspace]"""
-        response = self.api_server.get(path="/workspaces", api_key=api_key)
-        return [Workspace.init_from_dict(x) for x in response]
+        List[TimeGroup]"""
+        response = self.api_server.get(path="Catalog_ВидыИспользованияРабочегоВремени", auth=auth)
+        return [TimeGroup.init_from_dict(x) for x in response]
 
-    def make_workspace(self, api_key, workspace_name) -> Workspace:
-        """Post and create in Clockify workspace using workspace name with the given api key
+    def get_organizations(self, auth) -> List[Organization]:
+        """Get all organizations for the given account
 
         Parameters
         ----------
-        api_key: str
-            Clockify Api key
-        workspace_name: str
-            The name of the workspace to be created
+        auth: (str, str)
+            1C basic auth
 
         Returns
         -------
-        Workspace
-        """
-        response = self.api_server.post(path="/workspaces", api_key=api_key, data={"name": workspace_name})
-        return Workspace.init_from_dict(response)
+        List[Organization]"""
+        response = self.api_server.get(path="Catalog_Организации", auth=auth)
+        return [Organization.init_from_dict(x) for x in response]
+
+    def get_employees(self, auth) -> List[Employee]:
+        """Get all employees for the given account
+
+        Parameters
+        ----------
+        auth: (str, str)
+            1C basic auth
+
+        Returns
+        -------
+        List[Employee]"""
+        response = self.api_server.get(path="Catalog_Сотрудники", auth=auth)
+        return [Employee.init_from_dict(x) for x in response]
+
+    def get_time_sheet_lines(self, auth) -> List[TimeSheetLine]:
+        """Get all time sheet lines from documents time sheet for the given account
+
+        Parameters
+        ----------
+        auth: (str, str)
+            1C basic auth
+
+        Returns
+        -------
+        List[TimeSheetLine]"""
+        response = self.api_server.get(path="Document_ТабельУчетаРабочегоВремени", auth=auth)
+        return [TimeSheetLine.init_from_dict(x) for y in response for x in y["ДанныеОВремени"]]
+
 
     def get_user(self, api_key):
         """Get the user for the given api key
@@ -295,7 +333,7 @@ class API1C:
         response = self.api_server.get(path=f"/workspaces/{workspace.obj_id}/users", api_key=api_key, params=params)
         return [User.init_from_dict(x) for x in response]
 
-    def make_project(self, api_key: str, project_name: str, client: Client = None,
+    '''def make_project(self, api_key: str, project_name: str, client: Client = None,
                      additional_data: {str:str}=None)-> Project:
         """Post and create in Clockify project using project name with the given api key,
         for the given workspace
@@ -557,4 +595,4 @@ class API1C:
         except APIServer404:
             return None
 
-        return TimeEntry.init_from_dict(result)
+        return TimeEntry.init_from_dict(result)'''
