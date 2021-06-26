@@ -1,11 +1,11 @@
-""" Models the objects with which the clockify API works.
+""" Models the objects with which the 1C API works.
 Models as simply as possible, omitting any fields not used by this package
 TODO complete class and methods documentation
 """
 
 from typing import Type, List
 from abc import ABC, abstractmethod
-import datetime
+from datetime import datetime, date
 
 import dateutil
 import dateutil.parser as date_parser
@@ -154,26 +154,11 @@ class APIObject(ABC):
         """
         return
 
-#TODO currency converter feature
-class HourlyRate(APIObject):
-    """Feature of users per project and per workspace and default for project and workspace"""
+    @abstractmethod
+    def to_dict(self):
+        """As dict that can be sent to API"""
+        return
 
-    def __init__(self, amount: float, currency: str):
-        self.amount = amount
-        self.currency = currency
-
-    def __str__(self):
-        return super().__str__() + f"{self.amount} {self.currency}"
-
-    @classmethod
-    def init_from_dict(cls, dict_in) -> 'HourlyRate':
-        dict_hourlyRate = cls.get_item(dict_in=dict_in, key='hourlyRate')
-        #to prevent from get.item from None
-        if dict_hourlyRate:
-            return cls(amount=cls.get_item(dict_hourlyRate, key='amount')/100,
-                   currency=cls.get_item(dict_hourlyRate, key='currency'))
-        #else:
-            #return None
 
 class APIObjectID(APIObject):
     """An object that can be returned by the clockify API, has its ID, one level above json dicts."""
@@ -219,18 +204,10 @@ class APIObjectID(APIObject):
     def init_from_dict(cls, dict_in) -> Type[APIObject]:
         return cls(obj_id=cls.get_item(dict_in=dict_in, key='Ref_Key'))
 
-class UserGroup(APIObjectID):
-    """Group of Users - is used to assign multiple users to project
-    TO DO: implement class
-    """
+    def to_dict(self):
+        """As dict that can be sent to API"""
+        return {"Ref_Key": self.obj_id}
 
-    def __init__(self, obj_id, users):
-        super().__init__(obj_id=obj_id)
-        self.users = users
-
-    @classmethod
-    def init_from_dict(cls, dict_in):
-        pass
 
 class NamedAPIObject(APIObjectID):
     """An object of clockify API, with name and ID"""
@@ -254,6 +231,9 @@ class NamedAPIObject(APIObjectID):
         return cls(obj_id=cls.get_item(dict_in=dict_in, key='Ref_Key'),
             name=cls.get_item(dict_in=dict_in, key='Description'))
 
+    def to_dict(self):
+        return super().to_dict() | {"Description": self.name}
+
 
 class TimeGroup(NamedAPIObject):
     def __init__(self, obj_id, name: str, letter: str, digit: str):
@@ -269,8 +249,16 @@ class TimeGroup(NamedAPIObject):
                    digit=cls.get_item(dict_in=dict_in, key='ЦифровойКод'),
                    )
 
+    def to_dict(self):
+        as_dict = super().to_dict() | {'БуквенныйКод': self.letter, 'ЦифровойКод': self.digit}
+        return {x: y for x, y in as_dict.items() if y}  # remove items with None value
+
 
 class Organization(NamedAPIObject):
+    pass
+
+
+class Person(NamedAPIObject):
     pass
 
 
@@ -284,9 +272,14 @@ class Employee(NamedAPIObject):
     def init_from_dict(cls, dict_in):
         return cls(obj_id=cls.get_item(dict_in=dict_in, key='Ref_Key'),
                    name=cls.get_item(dict_in=dict_in, key='Description'),
-                   person=cls.get_item(dict_in=dict_in, key='ФизическоеЛицо_Key'),
-                   organization=cls.get_item(dict_in=dict_in, key='ГоловнаяОрганизация_Key'),
+                   person=APIObjectID(cls.get_item(dict_in=dict_in, key='ФизическоеЛицо_Key')),
+                   organization=APIObjectID(cls.get_item(dict_in=dict_in, key='ГоловнаяОрганизация_Key')),
                    )
+
+    def to_dict(self):
+        as_dict = super().to_dict() | \
+                  {"ФизическоеЛицо_Key": self.person.obj_id, "ГоловнаяОрганизация_Key": self.organization.obj_id}
+        return {x: y for x, y in as_dict.items() if y}  # remove items with None value
 
 
 class TimeSheetRecord:
@@ -327,92 +320,103 @@ class TimeSheetLine(APIObjectID):
                    number=cls.get_item(dict_in=dict_in, key='LineNumber'),
                    employee=APIObjectID(cls.get_item(dict_in=dict_in, key='Сотрудник_Key')),
                    time_sheet_records=[TimeSheetRecord(
-                       hours=cls.get_item(dict_in=dict_in, key="Часов" + str(i)),
-                       time_group=cls.get_item(dict_in=dict_in, key="ВидВремени" + str(i) + "_Key"),
-                       territory=cls.get_item(dict_in=dict_in, key="Территория" + str(i) + "_Key"),
-                       working_conditions=cls.get_item(dict_in=dict_in, key="УсловияТруда" + str(i) + "_Key"),
-                       work_shift=cls.get_item(dict_in=dict_in, key="ПереходящаяЧастьСмены" + str(i)),)
-                       for i in range(1, 31)],
+                       hours=cls.get_item(dict_in=dict_in, key=f'Часов{i}'),
+                       time_group=APIObjectID(cls.get_item(dict_in=dict_in, key=f'ВидВремени{i}_Key')),
+                       territory=APIObjectID(cls.get_item(dict_in=dict_in, key=f'Территория{i}_Key')),
+                       working_conditions=APIObjectID(cls.get_item(dict_in=dict_in,
+                                                                   key=f'УсловияТруда{i}_Key')),
+                       work_shift=cls.get_item(dict_in=dict_in, key=f'ПереходящаяЧастьСмены{i}'))
+                       for i in range(1, 32)],
                    )
 
+    def to_dict(self):
+        as_dict = super().to_dict() | \
+              {'LineNumber': self.number, 'Сотрудник_Key': self.employee.obj_id} | \
+              {f'Часов{i}': tsr.get_hours() for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
+              {f'ВидВремени{i}_Key': tsr.time_group.obj_id for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
+              {f'Территория{i}_Key': tsr.territory.obj_id for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
+              {f'УсловияТруда{i}_Key': tsr.working_conditions.obj_id
+               for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
+              {f'ПереходящаяЧастьСмены{i}': tsr.work_shift for i, tsr in zip(range(1, 32), self.time_sheet_records)}
+        return as_dict
+        #        {x: y for x, y in as_dict.items() if y}  # remove items with None value
 
 
-
-
-class User(NamedAPIObject):
-    def __init__(self, obj_id, name, email, hourly_rates: {APIObjectID: HourlyRate}):
-        super().__init__(obj_id=obj_id, name=name)
-        self.email = email
-        self.hourly_rates = hourly_rates
-
-    def __str__(self):
-        return super().__str__() + f"email:{self.email}"
+class TimeSheet(APIObjectID):
+    def __init__(self, obj_id,
+                 period: date,
+                 organization: APIObjectID,
+                 date_start: date,
+                 date_end: date,
+                 time_sheet_lines: List[TimeSheetLine],
+                 number: str = None,
+                 datetime_stamp: datetime = None,
+                 orgunit: APIObjectID = None):
+        """
+        Parameters
+        ----------
+        obj_id: str
+            object id hash
+        period: datetime.date
+            period of timesheet - by fact - month, but start date of the reported month
+            (in 1C - month - so it is datetime of 2021-06-01T00:00:00)
+        organization: APIObjectID
+            ref_key of the organization (to be substituted by object of Class Organization with full data if needed)
+        date_start: datetime.date
+            start date of the period (within the month of period)
+        date_end: datetime.date
+            end date of the period (see above date_start)
+        time_sheet_lines: List[TimeSheetLine]
+            lines with timesheet records for each employee (might be several lines per employee)
+        number: str
+            unique number of the timesheet, might be omitted, to be set up in 1C
+        datetime_stamp: datetime
+            date time stamp of the document TimeSheet, might be omitted, to be set up in 1C
+        orgunit: APIObjectID
+            ref_key of the organization unit (to be substituted by object of Class OrgUnit with full data if needed)
+        """
+        super().__init__(obj_id=obj_id)
+        #ToDo implement TypeError and ValueError for None and some strange years (e.g. 1970) with dates
+        self.period = period
+        self.organization = organization
+        self.date_start = date_start
+        self.date_end = date_end
+        self.time_sheet_lines = time_sheet_lines
+        if number:
+            self.number = number
+        if datetime_stamp:
+            self.datetime_stamp = datetime_stamp
+        if orgunit:
+            self.orgunit = orgunit
 
     @classmethod
     def init_from_dict(cls, dict_in):
-        obj_id = cls.get_item(dict_in=dict_in, key='id')
-        name = cls.get_item(dict_in=dict_in, key='name')
-        email = cls.get_item(dict_in=dict_in, key='email')
-        hourly_rates = {}
-        #TODO rewrite using get_item
-        for membership in dict_in['memberships']:
-            if membership['hourlyRate']:
-                api_id_project_or_workspace = APIObjectID(cls.get_item(dict_in=membership, key='targetId'))
-                hourly_rates[api_id_project_or_workspace] = HourlyRate.init_from_dict(membership)
-        return cls(obj_id=obj_id, name=name, email=email, hourly_rates=hourly_rates)
+        return cls(obj_id=cls.get_item(dict_in=dict_in, key='Ref_Key'),
+                   period=datetime.fromisoformat(cls.get_item(dict_in=dict_in, key='ПериодРегистрации')).date(),
+                   organization=APIObjectID(cls.get_item(dict_in=dict_in, key='Организация_Key')),
+                   date_start=datetime.fromisoformat(cls.get_item(dict_in=dict_in, key='ДатаНачалаПериода')).date(),
+                   date_end=datetime.fromisoformat(cls.get_item(dict_in=dict_in, key='ДатаОкончанияПериода')).date(),
+                   time_sheet_lines=[TimeSheetLine.init_from_dict(dict_in=d) for d in dict_in['ДанныеОВремени']],
+                   number=cls.get_item(dict_in=dict_in, key='Number'),
+                   datetime_stamp=datetime.fromisoformat(cls.get_item(dict_in=dict_in, key='Date')),
+                   orgunit=APIObjectID(cls.get_item(dict_in=dict_in, key='Подразделение_Key')),
+                   )
 
-    def get_hourly_rate(self, workspace, project) -> 'HourlyRate':
-        if project in self.hourly_rates.keys() and self.hourly_rates[project]:
-            return self.hourly_rates[project]
-        elif project in project.hourly_rates.keys() and project.hourly_rates[project]:
-            return project.hourly_rates[project]
-        elif workspace in self.hourly_rates.keys() and self.hourly_rates[workspace]:
-            return self.hourly_rates[workspace]
-        else:
-            return workspace.hourly_rate
+    def to_dict(self):
+        date_start_str = datetime.combine(self.date_start, datetime.min.time()).isoformat() if self.date_start else None
+        date_end_str = datetime.combine(self.date_end, datetime.min.time()).isoformat() if self.date_end else None
+        datetime_stamp_str = self.datetime_stamp.isoformat() if self.datetime_stamp else None
+        period_str = datetime.combine(self.period, datetime.min.time()).isoformat() if self.period else None
+        orgunit_str = self.orgunit.obj_id if self.orgunit else None
+        as_dict = super().to_dict() | \
+                  {'Number': self.number, 'Date': datetime_stamp_str, "ПериодРегистрации": period_str,
+                   'Организация_Key': self.organization.obj_id, 'Подразделение_Key': orgunit_str,
+                   'ДатаНачалаПериода': date_start_str, 'ДатаОкончанияПериода': date_end_str,
+                   'ДанныеОВремени': [x.to_dict() for x in self.time_sheet_lines]
+                   }
+        return as_dict
+            #{x: y for x, y in as_dict.items() if y}  # remove items with None value
 
-class Client(NamedAPIObject):
-    pass
-
-class Project(NamedAPIObject):
-    def __init__(self, obj_id, name: str, client: Client, hourly_rates: {APIObjectID: HourlyRate}):
-        super().__init__(obj_id=obj_id, name=name)
-        self.client = client
-        self.hourly_rates = hourly_rates
-
-    def __str__(self):
-        return super().__str__() + f"for client {self.client}"
-
-    @classmethod
-    def init_from_dict(cls, dict_in):
-        obj_id = cls.get_item(dict_in=dict_in, key='id')
-        name = cls.get_item(dict_in=dict_in, key='name')
-        api_id_client = APIObjectID(cls.get_item(dict_in=dict_in, key='clientId'))
-        api_id_project = APIObjectID(obj_id)
-        hourly_rates = {api_id_project: HourlyRate.init_from_dict(dict_in)}
-        for membership in dict_in['memberships']:
-            if membership['hourlyRate']:
-                api_id_user = APIObjectID(cls.get_item(dict_in=membership, key='userId'))
-                hourly_rates[api_id_user] = HourlyRate.init_from_dict(membership)
-        return cls(obj_id=obj_id, name=name, client=api_id_client, hourly_rates=hourly_rates)
-
-    def get_hourly_rate(self, workspace, user) -> 'HourlyRate':
-        if user in self.hourly_rates.keys() and self.hourly_rates[user]:
-            return self.hourly_rates[user]
-        elif self in self.hourly_rates.keys() and self.hourly_rates[self]:
-            return self.hourly_rates[self]
-        elif workspace in user.hourly_rates.keys() and user.hourly_rates[workspace]:
-            return user.hourly_rates[workspace]
-        else:
-            return workspace.hourly_rate
-
-
-
-class Task(NamedAPIObject):
-    pass
-
-class Tag(NamedAPIObject):
-    pass
 
 class TimeEntry(APIObjectID):
 

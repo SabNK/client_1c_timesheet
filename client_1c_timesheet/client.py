@@ -2,7 +2,7 @@
 import datetime
 from client_1c_timesheet.api import APIServer, APIServer404
 from client_1c_timesheet.decorators import request_rate_watchdog
-from client_1c_timesheet.models import TimeGroup, Organization, Employee, TimeSheetLine, TimeSheetRecord, User, Project, Task, TimeEntry, ClockifyDatetime, Tag, Client, HourlyRate
+from client_1c_timesheet.models import TimeGroup, Organization, Employee, TimeSheetLine, TimeSheetRecord, TimeSheet
 from functools import lru_cache
 from typing import List, Dict
 
@@ -48,6 +48,28 @@ class APISession:
     @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
     def get_time_sheet_lines(self) -> List[TimeSheetLine]:
         return self.api.get_time_sheet_lines(auth=self.auth)
+
+    @lru_cache()
+    @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
+    def get_time_sheets(self) -> List[TimeSheet]:
+        return self.api.get_time_sheets(auth=self.auth)
+
+    @request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
+    def add_time_sheet(self, time_sheet: TimeSheet) -> TimeSheet:
+        """Add the given time sheet document to 1C
+
+        Parameters
+        ----------
+        time_sheet: TimeSheet
+            The time sheet to add
+
+        Returns
+        -------
+        TimeSheet
+            The created time sheet
+
+        """
+        return self.api.add_time_sheet(auth=self.auth, time_sheet=time_sheet)
 
 '''@request_rate_watchdog(APIServer.RATE_LIMIT_REQUESTS_PER_SECOND)
     def make_workspace(self, workspace_name: str) -> Workspace:
@@ -298,8 +320,47 @@ class API1C:
         response = self.api_server.get(path="Document_ТабельУчетаРабочегоВремени", auth=auth)
         return [TimeSheetLine.init_from_dict(x) for y in response for x in y["ДанныеОВремени"]]
 
+    def get_time_sheets(self, auth) -> List[TimeSheet]:
+        """Get all time sheet documents for the given account
 
-    def get_user(self, api_key):
+        Parameters
+        ----------
+        auth: (str, str)
+            1C basic auth
+
+        Returns
+        -------
+        List[TimeSheet]"""
+        response = self.api_server.get(path="Document_ТабельУчетаРабочегоВремени", auth=auth)
+        return [TimeSheet.init_from_dict(x) for x in response]
+
+    def add_time_sheet(self, auth, time_sheet: TimeSheet):
+        """
+
+        Parameters
+        ----------
+        auth: (str, str)
+            1C basic auth
+        time_sheet: TimeSheet
+            the document Time Sheet to add to 1C
+
+        Returns
+        -------
+        TimeEntry
+            The created time entry
+
+        """
+
+        result = self.api_server.post(
+            path="Document_ТабельУчетаРабочегоВремени",
+            auth=auth,
+            data={k: v for k, v in time_sheet.to_dict().items() if k != "Ref_Key"},
+        )
+
+        return TimeSheet.init_from_dict(result)
+
+
+'''    def get_user(self, api_key):
         """Get the user for the given api key
 
         Parameters
@@ -333,7 +394,7 @@ class API1C:
         response = self.api_server.get(path=f"/workspaces/{workspace.obj_id}/users", api_key=api_key, params=params)
         return [User.init_from_dict(x) for x in response]
 
-    '''def make_project(self, api_key: str, project_name: str, client: Client = None,
+    def make_project(self, api_key: str, project_name: str, client: Client = None,
                      additional_data: {str:str}=None)-> Project:
         """Post and create in Clockify project using project name with the given api key,
         for the given workspace

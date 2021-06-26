@@ -14,7 +14,7 @@ class APIServer:
 
     Notes
     -----
-    For higher level interactions, see client.ClockifyAPI
+    For higher level interactions, see client.API1C
     """
     RATE_LIMIT_REQUESTS_PER_SECOND = 10  # limit by api
 
@@ -170,7 +170,10 @@ class APIRawResponse:
 
         """
         if self.raw_response.status_code in [200, 201]:
-            return self.parse_json(self.raw_response)['value']
+            if 'value' in self.parse_json(self.raw_response).keys():
+                return self.parse_json(self.raw_response)['value']
+            else:
+                return self.parse_json(self.raw_response)
         else:
             error_response = self.parse_json_clockify_error(self.raw_response)
             msg = f"HTTP {self.raw_response.status_code} containing API error '{self.raw_response.text}'"
@@ -223,20 +226,17 @@ class APIRawResponse:
         APIErrorResponse
         """
         parsed = self.parse_json(error_text)
-        # 1C api errors use either 'description' or 'message' for human readable component.
-        if 'message' in parsed.keys():
-            message = parsed['message']
-        elif 'description' in parsed.keys():
-            message = parsed['description']
-        else:
-            msg = f'Could not find "message" or "description" in {parsed}'
-            raise APIResponseParseException(msg)
-
-        if 'code' not in parsed.keys():
-            msg = f'Could not find "code" in {parsed}'
-            raise APIResponseParseException(msg)
-
-        return APIErrorResponse(code=parsed['code'], message=message)
+        # 1C api odata errors use 'message' for human readable component.
+        if 'odata.error' in parsed.keys():
+            if 'message' in parsed['odata.error'].keys() and 'value' in parsed['odata.error']['message']:
+                msg = parsed['odata.error']['message']['value']
+            else:
+                msg = f'Could not find "message" in {parsed}'
+                raise APIResponseParseException(msg)
+            if 'code' not in parsed['odata.error'].keys():
+                msg = f'Could not find "code" in {parsed}'
+                raise APIResponseParseException(msg)
+        return APIErrorResponse(code=parsed['odata.error']['code'], message=msg)
 
 
 class APIErrorResponse:
