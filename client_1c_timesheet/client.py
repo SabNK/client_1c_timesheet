@@ -335,6 +335,7 @@ class API1C:
         return [TimeSheet.init_from_dict(x) for x in response]
 
     def add_time_sheet(self, auth, time_sheet: TimeSheet):
+    #ToDo apply single get for TimeSheet with the new TimeSheet generated Ref_Key (obj_id)
         """
 
         Parameters
@@ -350,14 +351,12 @@ class API1C:
             The created time entry
 
         """
-
         result = self.api_server.post(
             path="Document_ТабельУчетаРабочегоВремени",
             auth=auth,
             data={k: v for k, v in time_sheet.to_dict().items() if k != "Ref_Key"},
         )
-
-        return TimeSheet.init_from_dict(result)
+        return True #TimeSheet.init_from_dict(result) - now result has no Ref_Key for TimeSheetLines.
 
 
 '''    def get_user(self, api_key):

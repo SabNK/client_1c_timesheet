@@ -12,13 +12,13 @@ import dateutil.parser as date_parser
 
 from client_1c_timesheet.exceptions import Client1CException
 
-class ClockifyDatetime:
+class Client1CDatetime:
     """For converting between python datetime and clockify datetime string
 
     ClockifyDatetime is always timezone aware. If initialized with a naive datetime, local time is assumed
     """
 
-    clockify_datetime_format = "%Y-%m-%dT%H:%M:%SZ"
+    datetime_format = "%Y-%m-%dT%H:%M:%SZ"
 
     def __init__(self, datetime_in):
         """Create
@@ -55,7 +55,7 @@ class ClockifyDatetime:
         return self.clockify_datetime
 
 class APIObject(ABC):
-    """An root for objects that is used in the clockify API and its children
+    """A root for objects that is used in the 1C API (odata.metadata) and its children
     can be intiated from API response"""
 
     def __str__(self):
@@ -173,8 +173,7 @@ class APIObjectID(APIObject):
 
 
     def __eq__(self, other):
-        """Some objects may be omitted in Clockify time entry (the regulation is forceProjects,
-        forceTasks, forceTags), so we introduced comparison to None
+        """Some objects may be omitted in 1C API so we introduced comparison to None
 
         Parameters
         ----------
@@ -194,7 +193,7 @@ class APIObjectID(APIObject):
         return not self.__eq__(other)
 
     def __hash__(self):
-        """using Clockify hash stored in obj_id"""
+        """using API hash stored in obj_id"""
         return self.obj_id.__hash__()
 
     def __str__(self):

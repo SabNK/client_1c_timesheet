@@ -42,7 +42,7 @@ def test_api_calls_get(an_api_session):
     assert time_sheet_lines[0].number == '4'
     assert time_sheet_lines[6].time_sheet_records[0].get_hours() == 8.3
     assert time_sheet_lines[8].time_sheet_records[15].time_group.obj_id == "b398cab2-6ae7-11eb-8358-080027d91ffd"
-    writetoafile('test_TimeSheetLine_json', time_sheet_lines[3].to_dict())
+    writetoafile('../credentials/test_TimeSheetLine_json', time_sheet_lines[3].to_dict())
     time_sheets = an_api_session.get_time_sheets()
     assert len(time_sheets) == 11
     with open("../credentials/output_filename", 'w', encoding='utf-8') as outfile:
@@ -54,10 +54,10 @@ def test_api_calls_get(an_api_session):
                   separators=(',', ': ')
                   )
 
-    writetoafile('test_TimeSheet_json', time_sheets[1].to_dict())
+    writetoafile('../credentials/test_TimeSheet_json', time_sheets[1].to_dict())
     time_sheets[1].number = '0000-000045'
     new_time_sheet = an_api_session.add_time_sheet(time_sheets[1])
-    with open("new_time_sheet", 'w', encoding='utf-8') as outfile:
+    with open("../credentials/new_time_sheet", 'w', encoding='utf-8') as outfile:
         json.dump(new_time_sheet.to_dict(),
                   outfile,
                   ensure_ascii=False,
