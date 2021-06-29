@@ -44,7 +44,7 @@ def test_api_calls_get(an_api_session):
     assert time_sheet_lines[8].time_sheet_records[15].time_group.obj_id == "b398cab2-6ae7-11eb-8358-080027d91ffd"
     writetoafile('../credentials/test_TimeSheetLine_json', time_sheet_lines[3].to_dict())
     time_sheets = an_api_session.get_time_sheets()
-    assert len(time_sheets) == 11
+    assert len(time_sheets) == 13
     with open("../credentials/output_filename", 'w', encoding='utf-8') as outfile:
         json.dump(time_sheets[1].to_dict(),
                   outfile,

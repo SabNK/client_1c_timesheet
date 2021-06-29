@@ -282,8 +282,9 @@ class Employee(NamedAPIObject):
 
 
 class TimeSheetRecord:
-    def __init__(self, hours: float, time_group: APIObjectID, territory: APIObjectID,
+    def __init__(self, day: int, hours: float, time_group: APIObjectID, territory: APIObjectID,
                  working_conditions: APIObjectID, work_shift: bool):
+        self.day = day
         self._hours = int(hours*10)
         self.time_group = time_group
         self.territory = territory
@@ -319,6 +320,7 @@ class TimeSheetLine(APIObjectID):
                    number=cls.get_item(dict_in=dict_in, key='LineNumber'),
                    employee=APIObjectID(cls.get_item(dict_in=dict_in, key='Сотрудник_Key')),
                    time_sheet_records=[TimeSheetRecord(
+                       day=i,
                        hours=cls.get_item(dict_in=dict_in, key=f'Часов{i}'),
                        time_group=APIObjectID(cls.get_item(dict_in=dict_in, key=f'ВидВремени{i}_Key')),
                        territory=APIObjectID(cls.get_item(dict_in=dict_in, key=f'Территория{i}_Key')),
@@ -329,14 +331,14 @@ class TimeSheetLine(APIObjectID):
                    )
 
     def to_dict(self):
+        tsr_dict = {tsr.day: tsr for tsr in self.time_sheet_records}
         as_dict = super().to_dict() | \
               {'LineNumber': self.number, 'Сотрудник_Key': self.employee.obj_id} | \
-              {f'Часов{i}': tsr.get_hours() for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
-              {f'ВидВремени{i}_Key': tsr.time_group.obj_id for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
-              {f'Территория{i}_Key': tsr.territory.obj_id for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
-              {f'УсловияТруда{i}_Key': tsr.working_conditions.obj_id
-               for i, tsr in zip(range(1, 32), self.time_sheet_records)} | \
-              {f'ПереходящаяЧастьСмены{i}': tsr.work_shift for i, tsr in zip(range(1, 32), self.time_sheet_records)}
+              {f'Часов{day}': tsr.get_hours() for day, tsr in tsr_dict.items()} | \
+              {f'ВидВремени{day}_Key': tsr.time_group.obj_id for day, tsr in tsr_dict.items()} | \
+              {f'Территория{day}_Key': tsr.territory.obj_id for day, tsr in tsr_dict.items()} | \
+              {f'УсловияТруда{day}_Key': tsr.working_conditions.obj_id for day, tsr in tsr_dict.items()} | \
+              {f'ПереходящаяЧастьСмены{day}': tsr.work_shift for day, tsr in tsr_dict.items()}
         return as_dict
         #        {x: y for x, y in as_dict.items() if y}  # remove items with None value
 
@@ -381,12 +383,9 @@ class TimeSheet(APIObjectID):
         self.date_start = date_start
         self.date_end = date_end
         self.time_sheet_lines = time_sheet_lines
-        if number:
-            self.number = number
-        if datetime_stamp:
-            self.datetime_stamp = datetime_stamp
-        if orgunit:
-            self.orgunit = orgunit
+        self.number = number if number else None
+        self.datetime_stamp = datetime_stamp if datetime_stamp else None
+        self.orgunit = orgunit if orgunit else None
 
     @classmethod
     def init_from_dict(cls, dict_in):
@@ -413,8 +412,7 @@ class TimeSheet(APIObjectID):
                    'ДатаНачалаПериода': date_start_str, 'ДатаОкончанияПериода': date_end_str,
                    'ДанныеОВремени': [x.to_dict() for x in self.time_sheet_lines]
                    }
-        return as_dict
-            #{x: y for x, y in as_dict.items() if y}  # remove items with None value
+        return {x: y for x, y in as_dict.items() if y}  # remove items with None value
 
 
 class TimeEntry(APIObjectID):
