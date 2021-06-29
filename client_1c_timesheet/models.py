@@ -12,6 +12,7 @@ import dateutil.parser as date_parser
 
 from client_1c_timesheet.exceptions import Client1CException
 
+
 class Client1CDatetime:
     """For converting between python datetime and clockify datetime string
 
@@ -320,14 +321,14 @@ class TimeSheetLine(APIObjectID):
                    number=cls.get_item(dict_in=dict_in, key='LineNumber'),
                    employee=APIObjectID(cls.get_item(dict_in=dict_in, key='Сотрудник_Key')),
                    time_sheet_records=[TimeSheetRecord(
-                       day=i,
-                       hours=cls.get_item(dict_in=dict_in, key=f'Часов{i}'),
-                       time_group=APIObjectID(cls.get_item(dict_in=dict_in, key=f'ВидВремени{i}_Key')),
-                       territory=APIObjectID(cls.get_item(dict_in=dict_in, key=f'Территория{i}_Key')),
+                       day=day,
+                       hours=cls.get_item(dict_in=dict_in, key=f'Часов{day}'),
+                       time_group=APIObjectID(cls.get_item(dict_in=dict_in, key=f'ВидВремени{day}_Key')),
+                       territory=APIObjectID(cls.get_item(dict_in=dict_in, key=f'Территория{day}_Key')),
                        working_conditions=APIObjectID(cls.get_item(dict_in=dict_in,
-                                                                   key=f'УсловияТруда{i}_Key')),
-                       work_shift=cls.get_item(dict_in=dict_in, key=f'ПереходящаяЧастьСмены{i}'))
-                       for i in range(1, 32)],
+                                                                   key=f'УсловияТруда{day}_Key')),
+                       work_shift=cls.get_item(dict_in=dict_in, key=f'ПереходящаяЧастьСмены{day}'))
+                       for day in range(1, 32)],
                    )
 
     def to_dict(self):
